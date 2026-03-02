@@ -91,7 +91,8 @@
     /* ─── Cards Grid ─────────────────────────────────────────────── */
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(260px, 280px));
+      justify-content: center;
       gap: 20px;
       width: 100%;
       max-width: 900px;
@@ -283,9 +284,11 @@
 
     .output-sub {
       font-size: 0.72rem;
+      line-height: 1.4;
       color: var(--text-muted);
       margin-top: 2px;
-      min-height: 1em;
+      height: calc(2 * 0.72rem * 1.4);
+      overflow: hidden;
     }
 
     /* ─── Footer ─────────────────────────────────────────────────── */
@@ -469,10 +472,10 @@
 
     // ─── Bracket labels for subtitle ─────────────────────────────────
     function ratingLabel(rating) {
-      if (rating < 1000) return "Low rating — keep climbing!";
+      if (rating < 1000) return "Low rating - keep climbing!";
       if (rating < 1400) return "Points ramp up fast from here";
-      if (rating < 1600) return "Steep gains — every win counts";
-      if (rating < 1800) return "Peak gains — biggest point jumps";
+      if (rating < 1600) return "Steep gains - every win counts";
+      if (rating < 1800) return "Peak gains - biggest point jumps";
       if (rating < 2000) return "Diminishing returns kicking in";
       if (rating < 2500) return "Minimal gains per rating";
       return "Curve is flat — near max points";
