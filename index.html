@@ -454,12 +454,14 @@
   </footer>
 
   <script>
+    // ─── Constants ────────────────────────────────────────────────────
+    const MULTIPLIERS = { "2v2": 1.14, "3v3": 1.32, "5v5": 1.50 };
+    const MIN_RATING = 0;
+    const MAX_RATING = 3000;
+
     // ─── Formula ──────────────────────────────────────────────────────
     // base(x) = (1651.94 - 475) / (1 + 2500000 * e^(-0.009x)) + 475
     // bracket points = base(x) * multiplier
-
-    const MULTIPLIERS = { "2v2": 1.14, "3v3": 1.32, "5v5": 1.50 };
-
     function calcPoints(rating, multiplier) {
       const base = (1651.94 - 475) / (1 + 2500000 * Math.exp(-0.009 * rating)) + 475;
       return Math.floor(base * multiplier);
@@ -468,84 +470,98 @@
     // ─── Bracket labels for subtitle ─────────────────────────────────
     function ratingLabel(rating) {
       if (rating < 1000) return "Low rating — keep climbing!";
-      if (rating < 1400) return "Getting started";
-      if (rating < 1600) return "Average";
-      if (rating < 1800) return "Above average";
-      if (rating < 2000) return "High rating";
-      if (rating < 2200) return "Elite";
-      return "Gladiator territory";
+      if (rating < 1400) return "Points ramp up fast from here";
+      if (rating < 1600) return "Steep gains — every win counts";
+      if (rating < 1800) return "Peak gains — biggest point jumps";
+      if (rating < 2000) return "Diminishing returns kicking in";
+      if (rating < 2500) return "Minimal gains per rating";
+      return "Curve is flat — near max points";
+    }
+
+    // ─── Validation ──────────────────────────────────────────────────
+    // Returns { valid: true, rating } or { valid: false, error }
+    function parseRating(raw) {
+      const trimmed = raw.trim();
+      if (trimmed === "") return { valid: false, error: null };
+
+      const rating = parseInt(trimmed, 10);
+      if (isNaN(rating) || !Number.isInteger(rating))
+        return { valid: false, error: "Please enter a whole number." };
+      if (rating < MIN_RATING)
+        return { valid: false, error: "Rating cannot be negative." };
+      if (rating > MAX_RATING)
+        return { valid: false, error: "Rating cannot exceed 3000." };
+
+      return { valid: true, rating };
+    }
+
+    // ─── Rendering ───────────────────────────────────────────────────
+    function renderEmpty(els) {
+      els.pts.textContent = "—";
+      els.pts.classList.remove("has-value");
+      els.sub.textContent = "Enter a rating above";
+      els.input.classList.remove("error");
+      els.msg.textContent = "";
+    }
+
+    function renderError(els, message) {
+      els.input.classList.add("error");
+      els.msg.textContent = message;
+      els.pts.textContent = "—";
+      els.pts.classList.remove("has-value");
+      els.sub.textContent = "";
+    }
+
+    function renderResult(els, pts, label) {
+      els.input.classList.remove("error");
+      els.msg.textContent = "";
+
+      if (els.pts.textContent !== String(pts)) {
+        els.pts.classList.remove("bump");
+        void els.pts.offsetWidth;
+        els.pts.classList.add("bump");
+      }
+
+      els.pts.textContent = pts.toLocaleString();
+      els.pts.classList.add("has-value");
+      els.sub.textContent = label;
     }
 
     // ─── Update a single bracket card ────────────────────────────────
-    function update(bracket) {
-      const input   = document.getElementById(`rating-${bracket}`);
-      const ptsEl   = document.getElementById(`pts-${bracket}`);
-      const subEl   = document.getElementById(`sub-${bracket}`);
-      const msgEl   = document.getElementById(`msg-${bracket}`);
+    function update(bracket, els) {
+      const result = parseRating(els.input.value);
 
-      const raw = input.value.trim();
-
-      // Empty state
-      if (raw === "") {
-        ptsEl.textContent = "—";
-        ptsEl.classList.remove("has-value");
-        subEl.textContent = "Enter a rating above";
-        input.classList.remove("error");
-        msgEl.textContent = "";
-        return;
+      if (!result.valid) {
+        return result.error ? renderError(els, result.error) : renderEmpty(els);
       }
 
-      const rating = parseInt(raw, 10);
-
-      // Validation
-      if (isNaN(rating) || !Number.isInteger(rating)) {
-        input.classList.add("error");
-        msgEl.textContent = "Please enter a whole number.";
-        ptsEl.textContent = "—";
-        ptsEl.classList.remove("has-value");
-        subEl.textContent = "";
-        return;
-      }
-
-      if (rating < 0 || rating > 3000) {
-        input.classList.add("error");
-        msgEl.textContent = rating < 0 ? "Rating cannot be negative." : "Rating cannot exceed 3000.";
-        ptsEl.textContent = "—";
-        ptsEl.classList.remove("has-value");
-        subEl.textContent = "";
-        return;
-      }
-
-      // Valid — calculate
-      input.classList.remove("error");
-      msgEl.textContent = "";
-
-      const pts = calcPoints(rating, MULTIPLIERS[bracket]);
-
-      // Animate bump if value changed
-      if (ptsEl.textContent !== String(pts)) {
-        ptsEl.classList.remove("bump");
-        void ptsEl.offsetWidth; // reflow to restart animation
-        ptsEl.classList.add("bump");
-      }
-
-      ptsEl.textContent = pts.toLocaleString();
-      ptsEl.classList.add("has-value");
-      subEl.textContent = ratingLabel(rating);
+      const pts = calcPoints(result.rating, MULTIPLIERS[bracket]);
+      renderResult(els, pts, ratingLabel(result.rating));
     }
 
-    // ─── Wire up inputs ───────────────────────────────────────────────
-    ["2v2", "3v3", "5v5"].forEach(bracket => {
-      const input = document.getElementById(`rating-${bracket}`);
+    // ─── Sanitize pasted/dropped content ─────────────────────────────
+    function sanitizeInput(input) {
+      const clean = input.value.replace(/[^\d]/g, "").slice(0, 4);
+      if (input.value !== clean) input.value = clean;
+    }
 
-      input.addEventListener("input", () => update(bracket));
+    // ─── Wire up inputs ──────────────────────────────────────────────
+    document.querySelectorAll("[data-bracket]").forEach(input => {
+      const bracket = input.dataset.bracket;
+      const els = {
+        input,
+        pts: document.getElementById(`pts-${bracket}`),
+        sub: document.getElementById(`sub-${bracket}`),
+        msg: document.getElementById(`msg-${bracket}`),
+      };
 
-      // Allow only digits (and allow clearing)
+      input.addEventListener("input", () => {
+        sanitizeInput(input);
+        update(bracket, els);
+      });
+
       input.addEventListener("keydown", e => {
-        const allowed = ["Backspace","Delete","Tab","ArrowLeft","ArrowRight","Home","End"];
-        if (allowed.includes(e.key)) return;
-        if (e.key === "Enter") { input.blur(); return; }
-        if (!/^\d$/.test(e.key)) e.preventDefault();
+        if (e.key === "Enter") input.blur();
       });
     });
   </script>
